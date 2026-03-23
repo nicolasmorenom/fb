@@ -544,7 +544,7 @@
         </div>
       </section>
 
-      <div class="footer-note">Data is stored locally in your browser using localStorage, while session access is remembered with sessionStorage.</div>
+      <div class="footer-note">Data is stored on the server and saved through API calls, while session access is remembered for the current browser session.</div>
     </main>
   </div>
 
@@ -612,18 +612,7 @@
   </div>
 
   <script>
-    const PASSWORD = 'MAcondo2026.';
     const AUTH_KEY = 'familyBudgetAuth';
-    const STORAGE_KEY = 'familyBudgetTrackerData';
-
-    const defaultCategories = [
-      { id: crypto.randomUUID(), name: 'Housing', icon: '🏠', color: '#9b6b43', budget: 2000 },
-      { id: crypto.randomUUID(), name: 'Groceries', icon: '🛒', color: '#7d9b5f', budget: 600 },
-      { id: crypto.randomUUID(), name: 'Transport', icon: '🚗', color: '#5e81ac', budget: 400 },
-      { id: crypto.randomUUID(), name: 'Utilities', icon: '⚡', color: '#c18c2e', budget: 200 },
-      { id: crypto.randomUUID(), name: 'Dining Out', icon: '🍽️', color: '#b35c44', budget: 300 },
-      { id: crypto.randomUUID(), name: 'Healthcare', icon: '💊', color: '#7d6db3', budget: 150 }
-    ];
 
     const els = {
       passwordGate: document.getElementById('passwordGate'),
@@ -665,31 +654,42 @@
     const state = {
       currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
       filter: 'all',
-      data: loadData()
+      data: {
+        categories: [],
+        transactions: []
+      },
+      isLoading: false
     };
 
-    function loadData() {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        const initial = { categories: defaultCategories, transactions: [] };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-        return initial;
+    async function apiFetch(url, options = {}) {
+      const response = await fetch(url, {
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        },
+        ...options
+      });
+
+      const isJson = response.headers.get('content-type')?.includes('application/json');
+      const payload = isJson ? await response.json() : null;
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Request failed.');
       }
+      return payload;
+    }
+
+    async function checkSession() {
       try {
-        const parsed = JSON.parse(raw);
-        return {
-          categories: Array.isArray(parsed.categories) && parsed.categories.length ? parsed.categories : defaultCategories,
-          transactions: Array.isArray(parsed.transactions) ? parsed.transactions : []
-        };
+        const result = await apiFetch('/api/session', { method: 'GET' });
+        return Boolean(result.authenticated);
       } catch {
-        const fallback = { categories: defaultCategories, transactions: [] };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
-        return fallback;
+        return false;
       }
     }
 
-    function saveData() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+    async function loadData() {
+      state.data = await apiFetch('/api/data', { method: 'GET' });
     }
 
     function formatMonth(date) {
@@ -802,10 +802,6 @@
 
     function renderTransactionOptions() {
       const baseOption = '<option value="">Uncategorized</option>';
-      if (!state.data.categories.length) {
-        els.transactionCategory.innerHTML = baseOption;
-        return;
-      }
       els.transactionCategory.innerHTML = baseOption + state.data.categories.map((category) => `
         <option value="${category.id}">${category.icon} ${category.name}</option>
       `).join('');
@@ -853,7 +849,6 @@
       renderTransactionOptions();
       renderBudgets();
       renderTransactions();
-      saveData();
     }
 
     function resetCategoryForm() {
@@ -920,7 +915,7 @@
       openModal('transaction');
     }
 
-    function deleteCategory(id) {
+    async function deleteCategory(id) {
       const category = getCategoryById(id);
       if (!category) return;
       const hasTransactions = state.data.transactions.some((item) => item.categoryId === id);
@@ -928,36 +923,46 @@
         ? `Delete ${category.name}? Transactions in this category will become uncategorized.`
         : `Delete ${category.name}?`;
       if (!window.confirm(message)) return;
-      state.data.categories = state.data.categories.filter((item) => item.id !== id);
-      state.data.transactions = state.data.transactions.map((item) => item.categoryId === id ? { ...item, categoryId: '' } : item);
+      await apiFetch(`/api/categories/${id}`, { method: 'DELETE' });
+      await loadData();
       renderAll();
     }
 
-    function deleteTransaction(id) {
+    async function deleteTransaction(id) {
       if (!window.confirm('Delete this transaction?')) return;
-      state.data.transactions = state.data.transactions.filter((item) => item.id !== id);
+      await apiFetch(`/api/transactions/${id}`, { method: 'DELETE' });
+      await loadData();
       renderAll();
     }
 
-    function unlockApp() {
+    async function unlockApp() {
       sessionStorage.setItem(AUTH_KEY, 'true');
       els.passwordGate.classList.add('hidden');
       els.appShell.classList.remove('hidden');
+      await loadData();
       renderAll();
     }
 
-    els.passwordForm.addEventListener('submit', (event) => {
+    async function handleLogin(password) {
+      await apiFetch('/api/login', {
+        method: 'POST',
+        body: JSON.stringify({ password })
+      });
+      await unlockApp();
+    }
+
+    els.passwordForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (els.passwordInput.value === PASSWORD) {
+      try {
+        await handleLogin(els.passwordInput.value);
         els.passwordError.textContent = '';
         els.passwordInput.classList.remove('shake');
-        unlockApp();
-        return;
+      } catch (error) {
+        els.passwordError.textContent = error.message || 'Incorrect password';
+        els.passwordInput.classList.remove('shake');
+        void els.passwordInput.offsetWidth;
+        els.passwordInput.classList.add('shake');
       }
-      els.passwordError.textContent = 'Incorrect password';
-      els.passwordInput.classList.remove('shake');
-      void els.passwordInput.offsetWidth;
-      els.passwordInput.classList.add('shake');
     });
 
     els.passwordInput.addEventListener('input', () => {
@@ -994,14 +999,18 @@
       button.addEventListener('click', () => closeModal(button.dataset.close));
     });
 
-    document.addEventListener('click', (event) => {
+    document.addEventListener('click', async (event) => {
       const trigger = event.target.closest('[data-action]');
       if (!trigger) return;
       const { action, id } = trigger.dataset;
-      if (action === 'edit-category') openCategoryModal(id);
-      if (action === 'delete-category') deleteCategory(id);
-      if (action === 'edit-transaction') openTransactionModal(id);
-      if (action === 'delete-transaction') deleteTransaction(id);
+      try {
+        if (action === 'edit-category') openCategoryModal(id);
+        if (action === 'delete-category') await deleteCategory(id);
+        if (action === 'edit-transaction') openTransactionModal(id);
+        if (action === 'delete-transaction') await deleteTransaction(id);
+      } catch (error) {
+        window.alert(error.message || 'Something went wrong.');
+      }
     });
 
     document.addEventListener('keydown', (event) => {
@@ -1018,29 +1027,38 @@
       });
     });
 
-    els.categoryForm.addEventListener('submit', (event) => {
+    els.categoryForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const payload = {
-        id: els.categoryId.value || crypto.randomUUID(),
         name: els.categoryName.value.trim(),
         icon: els.categoryIcon.value.trim(),
         color: els.categoryColor.value,
         budget: Number(els.categoryBudget.value)
       };
 
-      if (els.categoryId.value) {
-        state.data.categories = state.data.categories.map((item) => item.id === payload.id ? payload : item);
-      } else {
-        state.data.categories.push(payload);
+      try {
+        if (els.categoryId.value) {
+          await apiFetch(`/api/categories/${els.categoryId.value}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+        } else {
+          await apiFetch('/api/categories', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
+        await loadData();
+        closeModal('category');
+        renderAll();
+      } catch (error) {
+        window.alert(error.message || 'Could not save category.');
       }
-      closeModal('category');
-      renderAll();
     });
 
-    els.transactionForm.addEventListener('submit', (event) => {
+    els.transactionForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const payload = {
-        id: els.transactionId.value || crypto.randomUUID(),
         description: els.transactionDescription.value.trim(),
         amount: Number(els.transactionAmount.value),
         type: els.transactionType.value,
@@ -1049,21 +1067,42 @@
         member: els.transactionMember.value.trim()
       };
 
-      if (els.transactionId.value) {
-        state.data.transactions = state.data.transactions.map((item) => item.id === payload.id ? payload : item);
-      } else {
-        state.data.transactions.push(payload);
+      try {
+        if (els.transactionId.value) {
+          await apiFetch(`/api/transactions/${els.transactionId.value}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+        } else {
+          await apiFetch('/api/transactions', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
+        await loadData();
+        closeModal('transaction');
+        renderAll();
+      } catch (error) {
+        window.alert(error.message || 'Could not save transaction.');
       }
-      closeModal('transaction');
-      renderAll();
     });
 
-    renderTransactionOptions();
-    resetTransactionForm();
-
-    if (sessionStorage.getItem(AUTH_KEY) === 'true') {
-      unlockApp();
+    async function init() {
+      renderTransactionOptions();
+      resetTransactionForm();
+      const authenticated = await checkSession();
+      if (authenticated || sessionStorage.getItem(AUTH_KEY) === 'true') {
+        try {
+          await unlockApp();
+        } catch {
+          sessionStorage.removeItem(AUTH_KEY);
+          els.passwordGate.classList.remove('hidden');
+          els.appShell.classList.add('hidden');
+        }
+      }
     }
+
+    init();
   </script>
 </body>
 </html>
