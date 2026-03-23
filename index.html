@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Family Budget & Expense Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f5f0e8;
+      --paper: #fcf8f2;
+      --ink: #2d221b;
+      --muted: #7d6c5f;
+      --border: #dbcfc0;
+      --header: #2f241d;
+      --accent: #8c5e3c;
+      --accent-soft: #ead6bf;
+      --danger: #b6463d;
+      --success: #3c7b59;
+      --shadow: 0 12px 30px rgba(58, 38, 24, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .hidden { display: none !important; }
+
+    .password-gate {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, #fbf6ef 0%, var(--bg) 55%, #ece2d3 100%);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      z-index: 999;
+    }
+
+    .gate-card {
+      width: min(100%, 460px);
+      background: rgba(252, 248, 242, 0.92);
+      border: 1px solid rgba(219, 207, 192, 0.9);
+      border-radius: 28px;
+      padding: 38px 32px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      backdrop-filter: blur(6px);
+    }
+
+    .app-title,
+    .brand-title,
+    h2,
+    h3,
+    h4 {
+      font-family: 'Playfair Display', serif;
+      margin: 0;
+      letter-spacing: 0.01em;
+    }
+
+    .app-title {
+      font-size: clamp(2.1rem, 5vw, 3rem);
+      margin-bottom: 10px;
+    }
+
+    .gate-card p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .password-field {
+      display: grid;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #fffdfa;
+      color: var(--ink);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(140, 94, 60, 0.12);
+    }
+
+    .shake {
+      animation: shake 0.35s ease;
+      border-color: var(--danger) !important;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-5px); }
+      80% { transform: translateX(5px); }
+    }
+
+    .error-text {
+      min-height: 20px;
+      color: var(--danger);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 700;
+      transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--ink);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(47, 36, 29, 0.16);
+    }
+    .btn-secondary {
+      background: #efe4d5;
+      color: var(--ink);
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--ink);
+    }
+    .btn-danger {
+      background: rgba(182, 70, 61, 0.12);
+      color: var(--danger);
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(47, 36, 29, 0.96);
+      color: #fff;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    }
+
+    .header-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .brand-title { font-size: clamp(1.6rem, 3vw, 2rem); }
+    .header-subtitle { color: rgba(255,255,255,0.7); margin-top: 4px; font-size: 0.96rem; }
+
+    .month-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.08);
+      padding: 8px;
+      border-radius: 999px;
+    }
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 1.1rem;
+    }
+
+    .month-label {
+      min-width: 170px;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+    }
+
+    .container {
+      max-width: 1180px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .summary-grid,
+    .content-grid {
+      display: grid;
+      gap: 20px;
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .summary-card.negative .amount {
+      color: var(--danger);
+    }
+
+    .content-grid {
+      grid-template-columns: 1.1fr 0.9fr;
+      align-items: start;
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .muted { color: var(--muted); }
+    .amount {
+      font-family: 'DM Mono', monospace;
+      font-size: clamp(1.4rem, 2.5vw, 2rem);
+      margin-top: 8px;
+    }
+
+    .summary-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .summary-card::after {
+      content: '';
+      position: absolute;
+      inset: auto -20px -30px auto;
+      width: 100px;
+      height: 100px;
+      background: rgba(140, 94, 60, 0.08);
+      border-radius: 50%;
+    }
+
+    .budget-list,
+    .transaction-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .budget-item,
+    .transaction-item {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .budget-row,
+    .transaction-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .category-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    .category-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 1.2rem;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .progress-wrap {
+      margin-top: 14px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .progress-meta,
+    .transaction-meta,
+    .toolbar,
+    .inline-fields,
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .progress {
+      width: 100%;
+      height: 12px;
+      background: #eadfd1;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #f2e8db;
+      color: var(--ink);
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .transaction-main {
+      display: grid;
+      gap: 6px;
+    }
+
+    .transaction-amount {
+      font-family: 'DM Mono', monospace;
+      font-weight: 500;
+      font-size: 1rem;
+    }
+
+    .income { color: var(--success); }
+    .expense { color: var(--danger); }
+
+    .toolbar { margin-bottom: 16px; }
+    .filter-group {
+      display: inline-flex;
+      background: #efe4d5;
+      border-radius: 999px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .filter-btn {
+      border: none;
+      background: transparent;
+      color: var(--ink);
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .filter-btn.active {
+      background: var(--ink);
+      color: white;
+    }
+
+    .empty-state {
+      padding: 28px 18px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.35);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(31, 23, 18, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 300;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      width: min(100%, 560px);
+      max-height: min(90vh, 900px);
+      overflow: auto;
+      background: var(--paper);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(17, 11, 8, 0.2);
+      padding: 24px;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .form-grid.two-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 0.95rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 10px 0 0;
+    }
+
+    @media (max-width: 900px) {
+      .summary-grid,
+      .content-grid,
+      .form-grid.two-col {
+        grid-template-columns: 1fr;
+      }
+      .month-nav { width: 100%; justify-content: center; }
+      .month-label { min-width: auto; }
+    }
+
+    @media (max-width: 640px) {
+      .header-inner,
+      .card-header,
+      .toolbar,
+      .budget-row,
+      .transaction-row,
+      .progress-meta,
+      .transaction-meta,
+      .modal-actions {
+        align-items: stretch;
+      }
+      .icon-btn,
+      .btn { min-height: 44px; }
+      .container { padding-inline: 14px; }
+      .card, .modal, .gate-card { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="password-gate" id="passwordGate">
+    <div class="gate-card">
+      <h1 class="app-title">Family Budget & Expense Tracker</h1>
+      <p>Keep your household budget grounded, organized, and easy to review together.</p>
+      <form id="passwordForm" class="password-field">
+        <input id="passwordInput" type="password" placeholder="Enter password" aria-label="Password" autocomplete="current-password" />
+        <button class="btn btn-primary" type="submit">Unlock Budget</button>
+        <div class="error-text" id="passwordError" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="appShell">
+    <header class="header">
+      <div class="header-inner">
+        <div>
+          <h1 class="brand-title">Family Budget & Expense Tracker</h1>
+          <div class="header-subtitle">Warm, practical monthly budgeting for the whole household.</div>
+        </div>
+        <div class="month-nav">
+          <button class="icon-btn" id="prevMonth" aria-label="Previous month">←</button>
+          <div class="month-label" id="monthLabel"></div>
+          <button class="icon-btn" id="nextMonth" aria-label="Next month">→</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="summary-grid" id="summaryGrid"></section>
+
+      <section class="content-grid">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Budget Categories</h2>
+              <div class="muted">Track spending progress and monthly limits.</div>
+            </div>
+            <button class="btn btn-secondary" id="addCategoryBtn">+ Add Category</button>
+          </div>
+          <div class="budget-list" id="budgetList"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Transactions</h2>
+              <div class="muted">Review income and expenses for this month.</div>
+            </div>
+            <button class="btn btn-primary" id="addTransactionBtn">+ Add Transaction</button>
+          </div>
+
+          <div class="toolbar">
+            <div class="filter-group">
+              <button class="filter-btn active" data-filter="all">All</button>
+              <button class="filter-btn" data-filter="expense">Expenses</button>
+              <button class="filter-btn" data-filter="income">Income</button>
+            </div>
+            <div class="muted" id="transactionCount"></div>
+          </div>
+
+          <div class="transaction-list" id="transactionList"></div>
+        </div>
+      </section>
+
+      <div class="footer-note">Data is stored on the server and saved through API calls, while session access is remembered for the current browser session.</div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="categoryModalBackdrop">
+    <div class="modal">
+      <div class="card-header">
+        <div>
+          <h3 id="categoryModalTitle">Add Category</h3>
+          <div class="muted">Customize a monthly budget bucket.</div>
+        </div>
+        <button class="btn btn-ghost" type="button" data-close="category">Close</button>
+      </div>
+      <form id="categoryForm" class="form-grid">
+        <input type="hidden" id="categoryId" />
+        <div class="form-grid two-col">
+          <label>Name<input id="categoryName" required maxlength="30" placeholder="e.g. Childcare" /></label>
+          <label>Icon (emoji)<input id="categoryIcon" required maxlength="4" placeholder="🧸" /></label>
+        </div>
+        <div class="form-grid two-col">
+          <label>Color<input id="categoryColor" type="color" value="#9b6b43" /></label>
+          <label>Monthly Budget<input id="categoryBudget" type="number" min="0" step="0.01" required placeholder="0.00" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" type="button" data-close="category">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="transactionModalBackdrop">
+    <div class="modal">
+      <div class="card-header">
+        <div>
+          <h3 id="transactionModalTitle">Add Transaction</h3>
+          <div class="muted">Record income or spending for the household.</div>
+        </div>
+        <button class="btn btn-ghost" type="button" data-close="transaction">Close</button>
+      </div>
+      <form id="transactionForm" class="form-grid">
+        <input type="hidden" id="transactionId" />
+        <label>Description<input id="transactionDescription" required maxlength="80" placeholder="e.g. Weekly grocery run" /></label>
+        <div class="form-grid two-col">
+          <label>Amount<input id="transactionAmount" type="number" min="0" step="0.01" required placeholder="0.00" /></label>
+          <label>Type
+            <select id="transactionType" required>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-grid two-col">
+          <label>Category
+            <select id="transactionCategory" required></select>
+          </label>
+          <label>Date<input id="transactionDate" type="date" required /></label>
+        </div>
+        <label>Family Member<input id="transactionMember" required maxlength="40" placeholder="e.g. Alex" /></label>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" type="button" data-close="transaction">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save Transaction</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const AUTH_KEY = 'familyBudgetAuth';
+
+    const els = {
+      passwordGate: document.getElementById('passwordGate'),
+      appShell: document.getElementById('appShell'),
+      passwordForm: document.getElementById('passwordForm'),
+      passwordInput: document.getElementById('passwordInput'),
+      passwordError: document.getElementById('passwordError'),
+      monthLabel: document.getElementById('monthLabel'),
+      prevMonth: document.getElementById('prevMonth'),
+      nextMonth: document.getElementById('nextMonth'),
+      summaryGrid: document.getElementById('summaryGrid'),
+      budgetList: document.getElementById('budgetList'),
+      transactionList: document.getElementById('transactionList'),
+      transactionCount: document.getElementById('transactionCount'),
+      addCategoryBtn: document.getElementById('addCategoryBtn'),
+      addTransactionBtn: document.getElementById('addTransactionBtn'),
+      categoryModalBackdrop: document.getElementById('categoryModalBackdrop'),
+      transactionModalBackdrop: document.getElementById('transactionModalBackdrop'),
+      categoryModalTitle: document.getElementById('categoryModalTitle'),
+      transactionModalTitle: document.getElementById('transactionModalTitle'),
+      categoryForm: document.getElementById('categoryForm'),
+      transactionForm: document.getElementById('transactionForm'),
+      categoryId: document.getElementById('categoryId'),
+      categoryName: document.getElementById('categoryName'),
+      categoryIcon: document.getElementById('categoryIcon'),
+      categoryColor: document.getElementById('categoryColor'),
+      categoryBudget: document.getElementById('categoryBudget'),
+      transactionId: document.getElementById('transactionId'),
+      transactionDescription: document.getElementById('transactionDescription'),
+      transactionAmount: document.getElementById('transactionAmount'),
+      transactionType: document.getElementById('transactionType'),
+      transactionCategory: document.getElementById('transactionCategory'),
+      transactionDate: document.getElementById('transactionDate'),
+      transactionMember: document.getElementById('transactionMember'),
+      filterButtons: Array.from(document.querySelectorAll('.filter-btn')),
+      modalCloseButtons: Array.from(document.querySelectorAll('[data-close]'))
+    };
+
+    const state = {
+      currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      filter: 'all',
+      data: {
+        categories: [],
+        transactions: []
+      },
+      isLoading: false
+    };
+
+    async function apiFetch(url, options = {}) {
+      const response = await fetch(url, {
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        },
+        ...options
+      });
+
+      const isJson = response.headers.get('content-type')?.includes('application/json');
+      const payload = isJson ? await response.json() : null;
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Request failed.');
+      }
+      return payload;
+    }
+
+    async function checkSession() {
+      try {
+        const result = await apiFetch('/api/session', { method: 'GET' });
+        return Boolean(result.authenticated);
+      } catch {
+        return false;
+      }
+    }
+
+    async function loadData() {
+      state.data = await apiFetch('/api/data', { method: 'GET' });
+    }
+
+    function formatMonth(date) {
+      return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
+    }
+
+    function monthKey(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    }
+
+    function getTransactionsForMonth() {
+      const key = monthKey(state.currentMonth);
+      return state.data.transactions.filter((item) => (item.date || '').startsWith(key));
+    }
+
+    function getCategoryById(id) {
+      return state.data.categories.find((category) => category.id === id);
+    }
+
+    function getFilteredTransactions() {
+      const transactions = getTransactionsForMonth().sort((a, b) => new Date(b.date) - new Date(a.date));
+      if (state.filter === 'all') return transactions;
+      return transactions.filter((item) => item.type === state.filter);
+    }
+
+    function getDefaultTransactionDate() {
+      const today = new Date();
+      const sameMonth = today.getFullYear() === state.currentMonth.getFullYear()
+        && today.getMonth() === state.currentMonth.getMonth();
+      if (sameMonth) return today.toISOString().slice(0, 10);
+      return `${monthKey(state.currentMonth)}-01`;
+    }
+
+    function renderSummary() {
+      const monthlyTransactions = getTransactionsForMonth();
+      const totalIncome = monthlyTransactions.filter((t) => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+      const totalSpent = monthlyTransactions.filter((t) => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+      const remaining = totalIncome - totalSpent;
+      const totalBudget = state.data.categories.reduce((sum, category) => sum + Number(category.budget || 0), 0);
+
+      const cards = [
+        { title: 'Total Income', value: totalIncome, tone: '#dff2e7' },
+        { title: 'Total Spent', value: totalSpent, tone: '#f7dcd8' },
+        {
+          title: 'Remaining Balance',
+          value: remaining,
+          tone: remaining < 0 ? '#f4d6d0' : '#eadfcf',
+          negative: remaining < 0,
+          detail: `${formatCurrency(totalBudget)} budgeted this month`
+        }
+      ];
+
+      els.summaryGrid.innerHTML = cards.map((card) => `
+        <div class="card summary-card ${card.negative ? 'negative' : ''}">
+          <div class="tag" style="background:${card.tone}">${card.title}</div>
+          <div class="amount">${formatCurrency(card.value)}</div>
+          <div class="muted">${card.detail || `For ${formatMonth(state.currentMonth)}`}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderBudgets() {
+      const monthlyTransactions = getTransactionsForMonth();
+      if (!state.data.categories.length) {
+        els.budgetList.innerHTML = '<div class="empty-state">No categories yet. Add one to start planning this month.</div>';
+        return;
+      }
+
+      els.budgetList.innerHTML = state.data.categories.map((category) => {
+        const spent = monthlyTransactions
+          .filter((item) => item.type === 'expense' && item.categoryId === category.id)
+          .reduce((sum, item) => sum + Number(item.amount), 0);
+        const budget = Number(category.budget) || 0;
+        const progress = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+        const overBudget = spent > budget && budget > 0;
+        return `
+          <div class="budget-item">
+            <div class="budget-row">
+              <div class="category-pill">
+                <span class="category-icon" style="background:${category.color}22;color:${category.color}">${category.icon}</span>
+                <div>
+                  <div>${category.name}</div>
+                  <div class="muted">Target ${formatCurrency(budget)}</div>
+                </div>
+              </div>
+              <div class="inline-fields">
+                <button class="btn btn-ghost" type="button" data-action="edit-category" data-id="${category.id}">Edit</button>
+                <button class="btn btn-danger" type="button" data-action="delete-category" data-id="${category.id}">Delete</button>
+              </div>
+            </div>
+            <div class="progress-wrap">
+              <div class="progress-meta">
+                <span class="transaction-amount ${overBudget ? 'expense' : ''}">${formatCurrency(spent)} spent</span>
+                <span class="muted">${budget > 0 ? `${formatCurrency(Math.max(budget - spent, 0))} left • ${Math.round((spent / budget) * 100)}% of budget` : 'No budget set'}</span>
+              </div>
+              <div class="progress">
+                <div class="progress-bar" style="width:${progress}%;background:${overBudget ? 'var(--danger)' : category.color}"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTransactionOptions() {
+      const baseOption = '<option value="">Uncategorized</option>';
+      els.transactionCategory.innerHTML = baseOption + state.data.categories.map((category) => `
+        <option value="${category.id}">${category.icon} ${category.name}</option>
+      `).join('');
+    }
+
+    function renderTransactions() {
+      const filtered = getFilteredTransactions();
+      els.transactionCount.textContent = `${filtered.length} transaction${filtered.length === 1 ? '' : 's'}`;
+
+      if (!filtered.length) {
+        els.transactionList.innerHTML = '<div class="empty-state">No matching transactions for this month yet.</div>';
+        return;
+      }
+
+      els.transactionList.innerHTML = filtered.map((item) => {
+        const category = getCategoryById(item.categoryId);
+        return `
+          <div class="transaction-item">
+            <div class="transaction-row">
+              <div class="transaction-main">
+                <strong>${item.description}</strong>
+                <div class="transaction-meta">
+                  <span class="tag">${item.type === 'income' ? '↗ Income' : '↘ Expense'}</span>
+                  <span class="tag">${category ? `${category.icon} ${category.name}` : 'Uncategorized'}</span>
+                  <span class="muted">${new Date(item.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span class="muted">${item.member}</span>
+                </div>
+              </div>
+              <div style="text-align:right; display:grid; gap:8px;">
+                <span class="transaction-amount ${item.type}">${item.type === 'income' ? '+' : '-'}${formatCurrency(item.amount)}</span>
+                <div class="inline-fields">
+                  <button class="btn btn-ghost" type="button" data-action="edit-transaction" data-id="${item.id}">Edit</button>
+                  <button class="btn btn-danger" type="button" data-action="delete-transaction" data-id="${item.id}">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderAll() {
+      els.monthLabel.textContent = formatMonth(state.currentMonth);
+      renderSummary();
+      renderTransactionOptions();
+      renderBudgets();
+      renderTransactions();
+    }
+
+    function resetCategoryForm() {
+      els.categoryForm.reset();
+      els.categoryId.value = '';
+      els.categoryColor.value = '#9b6b43';
+      els.categoryModalTitle.textContent = 'Add Category';
+    }
+
+    function resetTransactionForm() {
+      els.transactionForm.reset();
+      els.transactionId.value = '';
+      els.transactionType.value = 'expense';
+      els.transactionDate.value = getDefaultTransactionDate();
+      els.transactionModalTitle.textContent = 'Add Transaction';
+      els.transactionCategory.value = '';
+    }
+
+    function openModal(type) {
+      if (type === 'category') els.categoryModalBackdrop.classList.add('open');
+      if (type === 'transaction') els.transactionModalBackdrop.classList.add('open');
+    }
+
+    function closeModal(type) {
+      if (type === 'category') {
+        els.categoryModalBackdrop.classList.remove('open');
+        resetCategoryForm();
+      }
+      if (type === 'transaction') {
+        els.transactionModalBackdrop.classList.remove('open');
+        resetTransactionForm();
+      }
+    }
+
+    function openCategoryModal(id) {
+      resetCategoryForm();
+      if (id) {
+        const category = getCategoryById(id);
+        if (!category) return;
+        els.categoryId.value = category.id;
+        els.categoryName.value = category.name;
+        els.categoryIcon.value = category.icon;
+        els.categoryColor.value = category.color;
+        els.categoryBudget.value = category.budget;
+        els.categoryModalTitle.textContent = 'Edit Category';
+      }
+      openModal('category');
+    }
+
+    function openTransactionModal(id) {
+      resetTransactionForm();
+      if (id) {
+        const item = state.data.transactions.find((transaction) => transaction.id === id);
+        if (!item) return;
+        els.transactionId.value = item.id;
+        els.transactionDescription.value = item.description;
+        els.transactionAmount.value = item.amount;
+        els.transactionType.value = item.type;
+        els.transactionCategory.value = item.categoryId;
+        els.transactionDate.value = item.date;
+        els.transactionMember.value = item.member;
+        els.transactionModalTitle.textContent = 'Edit Transaction';
+      }
+      openModal('transaction');
+    }
+
+    async function deleteCategory(id) {
+      const category = getCategoryById(id);
+      if (!category) return;
+      const hasTransactions = state.data.transactions.some((item) => item.categoryId === id);
+      const message = hasTransactions
+        ? `Delete ${category.name}? Transactions in this category will become uncategorized.`
+        : `Delete ${category.name}?`;
+      if (!window.confirm(message)) return;
+      await apiFetch(`/api/categories/${id}`, { method: 'DELETE' });
+      await loadData();
+      renderAll();
+    }
+
+    async function deleteTransaction(id) {
+      if (!window.confirm('Delete this transaction?')) return;
+      await apiFetch(`/api/transactions/${id}`, { method: 'DELETE' });
+      await loadData();
+      renderAll();
+    }
+
+    async function unlockApp() {
+      sessionStorage.setItem(AUTH_KEY, 'true');
+      els.passwordGate.classList.add('hidden');
+      els.appShell.classList.remove('hidden');
+      await loadData();
+      renderAll();
+    }
+
+    async function handleLogin(password) {
+      await apiFetch('/api/login', {
+        method: 'POST',
+        body: JSON.stringify({ password })
+      });
+      await unlockApp();
+    }
+
+    els.passwordForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await handleLogin(els.passwordInput.value);
+        els.passwordError.textContent = '';
+        els.passwordInput.classList.remove('shake');
+      } catch (error) {
+        els.passwordError.textContent = error.message || 'Incorrect password';
+        els.passwordInput.classList.remove('shake');
+        void els.passwordInput.offsetWidth;
+        els.passwordInput.classList.add('shake');
+      }
+    });
+
+    els.passwordInput.addEventListener('input', () => {
+      els.passwordError.textContent = '';
+      els.passwordInput.classList.remove('shake');
+    });
+
+    els.prevMonth.addEventListener('click', () => {
+      state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() - 1, 1);
+      renderAll();
+    });
+
+    els.nextMonth.addEventListener('click', () => {
+      state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() + 1, 1);
+      renderAll();
+    });
+
+    els.addCategoryBtn.addEventListener('click', () => openCategoryModal());
+    els.addTransactionBtn.addEventListener('click', () => {
+      renderTransactionOptions();
+      resetTransactionForm();
+      openTransactionModal();
+    });
+
+    els.filterButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        state.filter = button.dataset.filter;
+        els.filterButtons.forEach((btn) => btn.classList.toggle('active', btn === button));
+        renderTransactions();
+      });
+    });
+
+    els.modalCloseButtons.forEach((button) => {
+      button.addEventListener('click', () => closeModal(button.dataset.close));
+    });
+
+    document.addEventListener('click', async (event) => {
+      const trigger = event.target.closest('[data-action]');
+      if (!trigger) return;
+      const { action, id } = trigger.dataset;
+      try {
+        if (action === 'edit-category') openCategoryModal(id);
+        if (action === 'delete-category') await deleteCategory(id);
+        if (action === 'edit-transaction') openTransactionModal(id);
+        if (action === 'delete-transaction') await deleteTransaction(id);
+      } catch (error) {
+        window.alert(error.message || 'Something went wrong.');
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (els.transactionModalBackdrop.classList.contains('open')) closeModal('transaction');
+      if (els.categoryModalBackdrop.classList.contains('open')) closeModal('category');
+    });
+
+    [els.categoryModalBackdrop, els.transactionModalBackdrop].forEach((backdrop) => {
+      backdrop.addEventListener('click', (event) => {
+        if (event.target === backdrop) {
+          closeModal(backdrop === els.categoryModalBackdrop ? 'category' : 'transaction');
+        }
+      });
+    });
+
+    els.categoryForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {
+        name: els.categoryName.value.trim(),
+        icon: els.categoryIcon.value.trim(),
+        color: els.categoryColor.value,
+        budget: Number(els.categoryBudget.value)
+      };
+
+      try {
+        if (els.categoryId.value) {
+          await apiFetch(`/api/categories/${els.categoryId.value}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+        } else {
+          await apiFetch('/api/categories', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
+        await loadData();
+        closeModal('category');
+        renderAll();
+      } catch (error) {
+        window.alert(error.message || 'Could not save category.');
+      }
+    });
+
+    els.transactionForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {
+        description: els.transactionDescription.value.trim(),
+        amount: Number(els.transactionAmount.value),
+        type: els.transactionType.value,
+        categoryId: els.transactionCategory.value,
+        date: els.transactionDate.value,
+        member: els.transactionMember.value.trim()
+      };
+
+      try {
+        if (els.transactionId.value) {
+          await apiFetch(`/api/transactions/${els.transactionId.value}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+          });
+        } else {
+          await apiFetch('/api/transactions', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
+        await loadData();
+        closeModal('transaction');
+        renderAll();
+      } catch (error) {
+        window.alert(error.message || 'Could not save transaction.');
+      }
+    });
+
+    async function init() {
+      renderTransactionOptions();
+      resetTransactionForm();
+      const authenticated = await checkSession();
+      if (authenticated || sessionStorage.getItem(AUTH_KEY) === 'true') {
+        try {
+          await unlockApp();
+        } catch {
+          sessionStorage.removeItem(AUTH_KEY);
+          els.passwordGate.classList.remove('hidden');
+          els.appShell.classList.add('hidden');
+        }
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
