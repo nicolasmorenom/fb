@@ -17,12 +17,12 @@ function createId() {
 function getDefaultData() {
   return {
     categories: [
-      { id: createId(), name: 'Housing', icon: '🏠', color: '#9b6b43', budget: 2000 },
-      { id: createId(), name: 'Groceries', icon: '🛒', color: '#7d9b5f', budget: 600 },
-      { id: createId(), name: 'Transport', icon: '🚗', color: '#5e81ac', budget: 400 },
-      { id: createId(), name: 'Utilities', icon: '⚡', color: '#c18c2e', budget: 200 },
-      { id: createId(), name: 'Dining Out', icon: '🍽️', color: '#b35c44', budget: 300 },
-      { id: createId(), name: 'Healthcare', icon: '💊', color: '#7d6db3', budget: 150 }
+      { id: createId(), name: 'Housing', color: '#9b6b43', budget: 2000 },
+      { id: createId(), name: 'Groceries', color: '#7d9b5f', budget: 600 },
+      { id: createId(), name: 'Transport', color: '#5e81ac', budget: 400 },
+      { id: createId(), name: 'Utilities', color: '#c18c2e', budget: 200 },
+      { id: createId(), name: 'Dining Out', color: '#b35c44', budget: 300 },
+      { id: createId(), name: 'Healthcare', color: '#7d6db3', budget: 150 }
     ],
     transactions: []
   };
@@ -99,11 +99,9 @@ function readJsonBody(req) {
 
 function validateCategory(payload) {
   const name = String(payload.name || '').trim();
-  const icon = String(payload.icon || '').trim();
   const color = String(payload.color || '').trim();
   const budget = Number(payload.budget);
   if (!name) return 'Category name is required.';
-  if (!icon) return 'Category icon is required.';
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) return 'Category color must be a hex value.';
   if (!Number.isFinite(budget) || budget < 0) return 'Category budget must be a non-negative number.';
   return null;
@@ -168,7 +166,6 @@ const server = http.createServer(async (req, res) => {
       const category = {
         id: createId(),
         name: String(payload.name).trim(),
-        icon: String(payload.icon).trim(),
         color: String(payload.color).trim(),
         budget: Number(payload.budget)
       };
@@ -199,7 +196,6 @@ const server = http.createServer(async (req, res) => {
       const category = {
         id,
         name: String(payload.name).trim(),
-        icon: String(payload.icon).trim(),
         color: String(payload.color).trim(),
         budget: Number(payload.budget)
       };
