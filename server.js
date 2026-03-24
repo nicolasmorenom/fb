@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 3000);
-const PASSWORD = 'MAcondo2026.';
+const PASSWORD = 'hola';
 const DATA_FILE = path.join(__dirname, 'budget-data.json');
 const SESSION_COOKIE = 'familyBudgetSession';
 const sessions = new Map();
