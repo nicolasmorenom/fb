@@ -35,6 +35,28 @@
     button { cursor: pointer; }
     .hidden { display: none !important; }
 
+    .password-gate {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, #fbf6ef 0%, var(--bg) 55%, #ece2d3 100%);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      z-index: 999;
+    }
+
+    .gate-card {
+      width: min(100%, 460px);
+      background: rgba(252, 248, 242, 0.92);
+      border: 1px solid rgba(219, 207, 192, 0.9);
+      border-radius: 28px;
+      padding: 38px 32px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      backdrop-filter: blur(6px);
+    }
+
+    .app-title,
     .brand-title,
     h2,
     h3,
