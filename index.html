@@ -66,23 +66,6 @@
       letter-spacing: 0.01em;
     }
 
-    .app-title {
-      font-size: clamp(2.1rem, 5vw, 3rem);
-      margin-bottom: 10px;
-    }
-
-    .gate-card p {
-      margin: 0 0 20px;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-
-    .password-field {
-      display: grid;
-      gap: 12px;
-      margin-top: 20px;
-    }
-
     input,
     select {
       width: 100%;
@@ -99,26 +82,6 @@
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 4px rgba(140, 94, 60, 0.12);
-    }
-
-    .shake {
-      animation: shake 0.35s ease;
-      border-color: var(--danger) !important;
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20% { transform: translateX(-8px); }
-      40% { transform: translateX(8px); }
-      60% { transform: translateX(-5px); }
-      80% { transform: translateX(5px); }
-    }
-
-    .error-text {
-      min-height: 20px;
-      color: var(--danger);
-      font-size: 0.95rem;
-      font-weight: 700;
     }
 
     .btn {
@@ -475,24 +438,12 @@
       .icon-btn,
       .btn { min-height: 44px; }
       .container { padding-inline: 14px; }
-      .card, .modal, .gate-card { padding: 18px; }
+      .card, .modal { padding: 18px; }
     }
   </style>
 </head>
 <body>
-  <div class="password-gate" id="passwordGate">
-    <div class="gate-card">
-      <h1 class="app-title">Family Budget & Expense Tracker</h1>
-      <p>Keep your household budget grounded, organized, and easy to review together.</p>
-      <form id="passwordForm" class="password-field">
-        <input id="passwordInput" type="password" placeholder="Enter password" aria-label="Password" autocomplete="current-password" />
-        <button class="btn btn-primary" type="submit">Unlock Budget</button>
-        <div class="error-text" id="passwordError" aria-live="polite"></div>
-      </form>
-    </div>
-  </div>
-
-  <div class="app-shell hidden" id="appShell">
+  <div class="app-shell" id="appShell">
     <header class="header">
       <div class="header-inner">
         <div>
@@ -544,7 +495,7 @@
         </div>
       </section>
 
-      <div class="footer-note">Data is stored on the server and saved through API calls, while session access is remembered for the current browser session.</div>
+      <div class="footer-note">Data is stored on the server and saved through API calls.</div>
     </main>
   </div>
 
@@ -612,14 +563,8 @@
   </div>
 
   <script>
-    const AUTH_KEY = 'familyBudgetAuth';
-
     const els = {
-      passwordGate: document.getElementById('passwordGate'),
       appShell: document.getElementById('appShell'),
-      passwordForm: document.getElementById('passwordForm'),
-      passwordInput: document.getElementById('passwordInput'),
-      passwordError: document.getElementById('passwordError'),
       monthLabel: document.getElementById('monthLabel'),
       prevMonth: document.getElementById('prevMonth'),
       nextMonth: document.getElementById('nextMonth'),
@@ -678,16 +623,6 @@
       }
       return payload;
     }
-
-    async function checkSession() {
-      try {
-        const result = await apiFetch('/api/session', { method: 'GET' });
-        return Boolean(result.authenticated);
-      } catch {
-        return false;
-      }
-    }
-
     async function loadData() {
       state.data = await apiFetch('/api/data', { method: 'GET' });
     }
@@ -935,41 +870,6 @@
       renderAll();
     }
 
-    async function unlockApp() {
-      sessionStorage.setItem(AUTH_KEY, 'true');
-      els.passwordGate.classList.add('hidden');
-      els.appShell.classList.remove('hidden');
-      await loadData();
-      renderAll();
-    }
-
-    async function handleLogin(password) {
-      await apiFetch('/api/login', {
-        method: 'POST',
-        body: JSON.stringify({ password })
-      });
-      await unlockApp();
-    }
-
-    els.passwordForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      try {
-        await handleLogin(els.passwordInput.value);
-        els.passwordError.textContent = '';
-        els.passwordInput.classList.remove('shake');
-      } catch (error) {
-        els.passwordError.textContent = error.message || 'Incorrect password';
-        els.passwordInput.classList.remove('shake');
-        void els.passwordInput.offsetWidth;
-        els.passwordInput.classList.add('shake');
-      }
-    });
-
-    els.passwordInput.addEventListener('input', () => {
-      els.passwordError.textContent = '';
-      els.passwordInput.classList.remove('shake');
-    });
-
     els.prevMonth.addEventListener('click', () => {
       state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() - 1, 1);
       renderAll();
@@ -1086,19 +986,14 @@
         window.alert(error.message || 'Could not save transaction.');
       }
     });
-
     async function init() {
       renderTransactionOptions();
       resetTransactionForm();
-      const authenticated = await checkSession();
-      if (authenticated || sessionStorage.getItem(AUTH_KEY) === 'true') {
-        try {
-          await unlockApp();
-        } catch {
-          sessionStorage.removeItem(AUTH_KEY);
-          els.passwordGate.classList.remove('hidden');
-          els.appShell.classList.add('hidden');
-        }
+      try {
+        await loadData();
+        renderAll();
+      } catch (error) {
+        window.alert(error.message || 'Could not load data.');
       }
     }
 

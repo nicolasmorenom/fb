@@ -5,10 +5,7 @@ const crypto = require('crypto');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 3000);
-const PASSWORD = 'hola';
 const DATA_FILE = path.join(__dirname, 'budget-data.json');
-const SESSION_COOKIE = 'familyBudgetSession';
-const sessions = new Map();
 
 function createId() {
   if (typeof crypto.randomUUID === 'function') {
@@ -56,25 +53,6 @@ function writeData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-function parseCookies(req) {
-  const header = req.headers.cookie || '';
-  return header.split(';').reduce((acc, part) => {
-    const trimmed = part.trim();
-    if (!trimmed) return acc;
-    const eqIndex = trimmed.indexOf('=');
-    const key = eqIndex >= 0 ? trimmed.slice(0, eqIndex) : trimmed;
-    const value = eqIndex >= 0 ? trimmed.slice(eqIndex + 1) : '';
-    acc[key] = decodeURIComponent(value);
-    return acc;
-  }, {});
-}
-
-function getSession(req) {
-  const cookies = parseCookies(req);
-  const token = cookies[SESSION_COOKIE];
-  if (!token) return null;
-  return sessions.get(token) ? token : null;
-}
 
 function sendJson(res, statusCode, payload, headers = {}) {
   res.writeHead(statusCode, {
@@ -118,11 +96,6 @@ function readJsonBody(req) {
   });
 }
 
-function requireAuth(req, res) {
-  if (getSession(req)) return true;
-  sendJson(res, 401, { error: 'Unauthorized' });
-  return false;
-}
 
 function validateCategory(payload) {
   const name = String(payload.name || '').trim();
@@ -178,46 +151,12 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const { pathname } = url;
 
-  if (pathname === '/api/session' && req.method === 'GET') {
-    sendJson(res, 200, { authenticated: Boolean(getSession(req)) });
-    return;
-  }
-
-  if (pathname === '/api/login' && req.method === 'POST') {
-    try {
-      const body = await readJsonBody(req);
-      if (body.password !== PASSWORD) {
-        sendJson(res, 401, { error: 'Incorrect password' });
-        return;
-      }
-      const token = createId();
-      sessions.set(token, true);
-      sendJson(res, 200, { authenticated: true }, {
-        'Set-Cookie': `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax`
-      });
-    } catch (error) {
-      sendJson(res, 400, { error: error.message });
-    }
-    return;
-  }
-
-  if (pathname === '/api/logout' && req.method === 'POST') {
-    const token = getSession(req);
-    if (token) sessions.delete(token);
-    sendJson(res, 200, { authenticated: false }, {
-      'Set-Cookie': `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`
-    });
-    return;
-  }
-
   if (pathname === '/api/data' && req.method === 'GET') {
-    if (!requireAuth(req, res)) return;
     sendJson(res, 200, readData());
     return;
   }
 
   if (pathname === '/api/categories' && req.method === 'POST') {
-    if (!requireAuth(req, res)) return;
     try {
       const payload = await readJsonBody(req);
       const error = validateCategory(payload);
@@ -243,7 +182,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.startsWith('/api/categories/') && req.method === 'PUT') {
-    if (!requireAuth(req, res)) return;
     try {
       const id = pathname.split('/').pop();
       const payload = await readJsonBody(req);
@@ -275,7 +213,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.startsWith('/api/categories/') && req.method === 'DELETE') {
-    if (!requireAuth(req, res)) return;
     const id = pathname.split('/').pop();
     const data = readData();
     data.categories = data.categories.filter((item) => item.id !== id);
@@ -286,7 +223,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/transactions' && req.method === 'POST') {
-    if (!requireAuth(req, res)) return;
     try {
       const payload = await readJsonBody(req);
       const error = validateTransaction(payload);
@@ -314,7 +250,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.startsWith('/api/transactions/') && req.method === 'PUT') {
-    if (!requireAuth(req, res)) return;
     try {
       const id = pathname.split('/').pop();
       const payload = await readJsonBody(req);
@@ -348,7 +283,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.startsWith('/api/transactions/') && req.method === 'DELETE') {
-    if (!requireAuth(req, res)) return;
     const id = pathname.split('/').pop();
     const data = readData();
     data.transactions = data.transactions.filter((item) => item.id !== id);
