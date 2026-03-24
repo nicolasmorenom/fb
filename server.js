@@ -3,9 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { URL } = require('url');
+const { DatabaseSync } = require('node:sqlite');
 
 const PORT = Number(process.env.PORT || 3000);
-const DATA_FILE = path.join(__dirname, 'budget-data.json');
+const DB_FILE = path.join(__dirname, 'budget.db');
 
 function createId() {
   if (typeof crypto.randomUUID === 'function') {
@@ -14,45 +15,78 @@ function createId() {
   return crypto.randomBytes(16).toString('hex');
 }
 
-function getDefaultData() {
+const defaultCategories = [
+  { name: 'Housing', color: '#9b6b43', budget: 2000 },
+  { name: 'Groceries', color: '#7d9b5f', budget: 600 },
+  { name: 'Transport', color: '#5e81ac', budget: 400 },
+  { name: 'Utilities', color: '#c18c2e', budget: 200 },
+  { name: 'Dining Out', color: '#b35c44', budget: 300 },
+  { name: 'Healthcare', color: '#7d6db3', budget: 150 }
+];
+
+const db = new DatabaseSync(DB_FILE);
+
+function setupDatabase() {
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL,
+      budget REAL NOT NULL CHECK (budget >= 0)
+    );
+    CREATE TABLE IF NOT EXISTS transactions (
+      id TEXT PRIMARY KEY,
+      description TEXT NOT NULL,
+      amount REAL NOT NULL CHECK (amount >= 0),
+      type TEXT NOT NULL CHECK (type IN ('income','expense')),
+      category_id TEXT NOT NULL DEFAULT '',
+      date TEXT NOT NULL,
+      member TEXT NOT NULL
+    );
+  `);
+
+  const categoryCount = db.prepare('SELECT COUNT(*) AS count FROM categories').get().count;
+  if (!categoryCount) {
+    const insertCategory = db.prepare(`
+      INSERT INTO categories (id, name, color, budget)
+      VALUES (?, ?, ?, ?)
+    `);
+    defaultCategories.forEach((category) => {
+      insertCategory.run(createId(), category.name, category.color, category.budget);
+    });
+  }
+}
+
+function listCategories() {
+  return db.prepare(`
+    SELECT id, name, color, budget
+    FROM categories
+    ORDER BY rowid ASC
+  `).all();
+}
+
+function listTransactions() {
+  return db.prepare(`
+    SELECT
+      id,
+      description,
+      amount,
+      type,
+      category_id AS categoryId,
+      date,
+      member
+    FROM transactions
+    ORDER BY date DESC, rowid DESC
+  `).all();
+}
+
+function getAllData() {
   return {
-    categories: [
-      { id: createId(), name: 'Housing', color: '#9b6b43', budget: 2000 },
-      { id: createId(), name: 'Groceries', color: '#7d9b5f', budget: 600 },
-      { id: createId(), name: 'Transport', color: '#5e81ac', budget: 400 },
-      { id: createId(), name: 'Utilities', color: '#c18c2e', budget: 200 },
-      { id: createId(), name: 'Dining Out', color: '#b35c44', budget: 300 },
-      { id: createId(), name: 'Healthcare', color: '#7d6db3', budget: 150 }
-    ],
-    transactions: []
+    categories: listCategories(),
+    transactions: listTransactions()
   };
 }
-
-function ensureDataFile() {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(getDefaultData(), null, 2));
-  }
-}
-
-function readData() {
-  ensureDataFile();
-  try {
-    const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return {
-      categories: Array.isArray(parsed.categories) ? parsed.categories : getDefaultData().categories,
-      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : []
-    };
-  } catch {
-    const fallback = getDefaultData();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(fallback, null, 2));
-    return fallback;
-  }
-}
-
-function writeData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
 
 function sendJson(res, statusCode, payload, headers = {}) {
   res.writeHead(statusCode, {
@@ -95,7 +129,6 @@ function readJsonBody(req) {
     req.on('error', reject);
   });
 }
-
 
 function validateCategory(payload) {
   const name = String(payload.name || '').trim();
@@ -150,7 +183,7 @@ const server = http.createServer(async (req, res) => {
   const { pathname } = url;
 
   if (pathname === '/api/data' && req.method === 'GET') {
-    sendJson(res, 200, readData());
+    sendJson(res, 200, getAllData());
     return;
   }
 
@@ -162,15 +195,16 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error });
         return;
       }
-      const data = readData();
       const category = {
         id: createId(),
         name: String(payload.name).trim(),
         color: String(payload.color).trim(),
         budget: Number(payload.budget)
       };
-      data.categories.push(category);
-      writeData(data);
+      db.prepare(`
+        INSERT INTO categories (id, name, color, budget)
+        VALUES (?, ?, ?, ?)
+      `).run(category.id, category.name, category.color, category.budget);
       sendJson(res, 201, category);
     } catch (error) {
       sendJson(res, 400, { error: error.message });
@@ -187,9 +221,8 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error });
         return;
       }
-      const data = readData();
-      const index = data.categories.findIndex((item) => item.id === id);
-      if (index === -1) {
+      const exists = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
+      if (!exists) {
         sendJson(res, 404, { error: 'Category not found.' });
         return;
       }
@@ -199,8 +232,11 @@ const server = http.createServer(async (req, res) => {
         color: String(payload.color).trim(),
         budget: Number(payload.budget)
       };
-      data.categories[index] = category;
-      writeData(data);
+      db.prepare(`
+        UPDATE categories
+        SET name = ?, color = ?, budget = ?
+        WHERE id = ?
+      `).run(category.name, category.color, category.budget, id);
       sendJson(res, 200, category);
     } catch (error) {
       sendJson(res, 400, { error: error.message });
@@ -210,10 +246,8 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname.startsWith('/api/categories/') && req.method === 'DELETE') {
     const id = pathname.split('/').pop();
-    const data = readData();
-    data.categories = data.categories.filter((item) => item.id !== id);
-    data.transactions = data.transactions.map((item) => item.categoryId === id ? { ...item, categoryId: '' } : item);
-    writeData(data);
+    db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+    db.prepare("UPDATE transactions SET category_id = '' WHERE category_id = ?").run(id);
     sendJson(res, 200, { success: true });
     return;
   }
@@ -226,7 +260,6 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error });
         return;
       }
-      const data = readData();
       const transaction = {
         id: createId(),
         description: String(payload.description).trim(),
@@ -236,8 +269,18 @@ const server = http.createServer(async (req, res) => {
         date: String(payload.date).trim(),
         member: String(payload.member).trim()
       };
-      data.transactions.push(transaction);
-      writeData(data);
+      db.prepare(`
+        INSERT INTO transactions (id, description, amount, type, category_id, date, member)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        transaction.id,
+        transaction.description,
+        transaction.amount,
+        transaction.type,
+        transaction.categoryId,
+        transaction.date,
+        transaction.member
+      );
       sendJson(res, 201, transaction);
     } catch (error) {
       sendJson(res, 400, { error: error.message });
@@ -254,9 +297,8 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error });
         return;
       }
-      const data = readData();
-      const index = data.transactions.findIndex((item) => item.id === id);
-      if (index === -1) {
+      const exists = db.prepare('SELECT id FROM transactions WHERE id = ?').get(id);
+      if (!exists) {
         sendJson(res, 404, { error: 'Transaction not found.' });
         return;
       }
@@ -269,8 +311,19 @@ const server = http.createServer(async (req, res) => {
         date: String(payload.date).trim(),
         member: String(payload.member).trim()
       };
-      data.transactions[index] = transaction;
-      writeData(data);
+      db.prepare(`
+        UPDATE transactions
+        SET description = ?, amount = ?, type = ?, category_id = ?, date = ?, member = ?
+        WHERE id = ?
+      `).run(
+        transaction.description,
+        transaction.amount,
+        transaction.type,
+        transaction.categoryId,
+        transaction.date,
+        transaction.member,
+        id
+      );
       sendJson(res, 200, transaction);
     } catch (error) {
       sendJson(res, 400, { error: error.message });
@@ -280,9 +333,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname.startsWith('/api/transactions/') && req.method === 'DELETE') {
     const id = pathname.split('/').pop();
-    const data = readData();
-    data.transactions = data.transactions.filter((item) => item.id !== id);
-    writeData(data);
+    db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
     sendJson(res, 200, { success: true });
     return;
   }
@@ -295,7 +346,9 @@ const server = http.createServer(async (req, res) => {
   sendText(res, 404, 'Not found');
 });
 
+setupDatabase();
+
 server.listen(PORT, () => {
-  ensureDataFile();
   console.log(`Family Budget server listening on http://localhost:${PORT}`);
+  console.log(`Using SQLite database at ${DB_FILE}`);
 });

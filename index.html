@@ -382,6 +382,17 @@
       padding: 10px 0 0;
     }
 
+    .status-banner {
+      margin-top: 10px;
+      border: 1px solid #e2c7c1;
+      background: #f9e8e5;
+      color: #7a2b23;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
     @media (max-width: 900px) {
       .summary-grid,
       .content-grid,
@@ -463,7 +474,8 @@
         </div>
       </section>
 
-      <div class="footer-note">Data is stored on the server and saved through API calls.</div>
+      <div class="footer-note">Data is stored in SQLite on the server and saved through API calls.</div>
+      <div class="status-banner hidden" id="appStatus" role="status" aria-live="polite"></div>
     </main>
   </div>
 
@@ -557,7 +569,8 @@
       transactionDate: document.getElementById('transactionDate'),
       transactionMember: document.getElementById('transactionMember'),
       filterButtons: Array.from(document.querySelectorAll('.filter-btn')),
-      modalCloseButtons: Array.from(document.querySelectorAll('[data-close]'))
+      modalCloseButtons: Array.from(document.querySelectorAll('[data-close]')),
+      appStatus: document.getElementById('appStatus')
     };
 
     const state = {
@@ -571,14 +584,19 @@
     };
 
     async function apiFetch(url, options = {}) {
-      const response = await fetch(url, {
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options.headers || {})
-        },
-        ...options
-      });
+      let response;
+      try {
+        response = await fetch(url, {
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          },
+          ...options
+        });
+      } catch {
+        throw new Error('Cannot reach the server. Run `npm start` and open http://localhost:3000.');
+      }
 
       const isJson = response.headers.get('content-type')?.includes('application/json');
       const payload = isJson ? await response.json() : null;
@@ -587,6 +605,17 @@
       }
       return payload;
     }
+
+    function showStatus(message) {
+      els.appStatus.textContent = message;
+      els.appStatus.classList.remove('hidden');
+    }
+
+    function clearStatus() {
+      els.appStatus.textContent = '';
+      els.appStatus.classList.add('hidden');
+    }
+
     async function loadData() {
       state.data = await apiFetch('/api/data', { method: 'GET' });
     }
@@ -870,7 +899,9 @@
         if (action === 'delete-category') await deleteCategory(id);
         if (action === 'edit-transaction') openTransactionModal(id);
         if (action === 'delete-transaction') await deleteTransaction(id);
+        clearStatus();
       } catch (error) {
+        showStatus(error.message || 'Something went wrong.');
         window.alert(error.message || 'Something went wrong.');
       }
     });
@@ -912,7 +943,9 @@
         await loadData();
         closeModal('category');
         renderAll();
+        clearStatus();
       } catch (error) {
+        showStatus(error.message || 'Could not save category.');
         window.alert(error.message || 'Could not save category.');
       }
     });
@@ -943,7 +976,9 @@
         await loadData();
         closeModal('transaction');
         renderAll();
+        clearStatus();
       } catch (error) {
+        showStatus(error.message || 'Could not save transaction.');
         window.alert(error.message || 'Could not save transaction.');
       }
     });
@@ -953,7 +988,9 @@
       try {
         await loadData();
         renderAll();
+        clearStatus();
       } catch (error) {
+        showStatus(error.message || 'Could not load data.');
         window.alert(error.message || 'Could not load data.');
       }
     }
